@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Missão Tabuada FINAL</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #1e3c72, #2a5298);
+    color: white;
+    text-align: center;
+}
+
+.tela { display: none; }
+.ativa { display: block; }
+
+button {
+    width: 80%;
+    padding: 15px;
+    margin: 10px auto;
+    font-size: 20px;
+    border-radius: 15px;
+    border: none;
+    background: linear-gradient(145deg, #00c6ff, #0072ff);
+    color: white;
+}
+
+.hud {
+    display: flex;
+    justify-content: space-around;
+    margin: 10px;
+}
+
+.pergunta {
+    font-size: 34px;
+    margin: 20px;
+}
+
+/* PERSONAGEM */
+.personagem {
+    font-size: 80px;
+    transition: 0.3s;
+}
+
+/* ANIMAÇÕES */
+.acertoAnim {
+    transform: scale(1.2) rotate(10deg);
+}
+.erroAnim {
+    transform: scale(0.8) rotate(-10deg);
+}
+
+/* TIMER */
+#timerBar {
+    width: 90%;
+    height: 20px;
+    background: #333;
+    margin: auto;
+    border-radius: 10px;
+}
+
+#timer {
+    height: 100%;
+    background: lime;
+    width: 100%;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- MENU -->
+<div id="menu" class="ativa">
+    <h1>🎮 Missão Tabuada</h1>
+
+    <input id="nome" placeholder="Digite seu nome" style="padding:10px; width:70%; border-radius:10px;">
+
+    <button onclick="iniciar('facil')">🌱 Fácil</button>
+    <button onclick="iniciar('medio')">⚡ Médio</button>
+    <button onclick="iniciar('dificil')">🔥 Difícil</button>
+
+    <h3>🏆 Ranking</h3>
+    <div id="ranking"></div>
+</div>
+
+<!-- JOGO -->
+<div id="jogo" class="tela">
+    <div class="hud">
+        <div>❤️ <span id="vidas">3</span></div>
+        <div>🏆 <span id="pontos">0</span></div>
+    </div>
+
+    <div id="timerBar"><div id="timer"></div></div>
+    <p><span id="tempoNum">5</span>s</p>
+
+    <div class="personagem" id="personagem">🧑‍🚀</div>
+
+    <div class="pergunta" id="pergunta"></div>
+    <div id="respostas"></div>
+</div>
+
+<script>
+let pontos, vidas, dificuldade, nome;
+let respostaCorreta;
+let tempoMax = 5000;
+let tempoAtual, timer;
+
+/* 🎵 MUSICA DE FUNDO */
+let ctx = new AudioContext();
+function musica(){
+    let osc = ctx.createOscillator();
+    let gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 200;
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    gain.gain.setValueAtTime(0.05, ctx.currentTime);
+    osc.start();
+
+    setInterval(()=>{
+        osc.frequency.value = 200 + Math.random()*200;
+    },500);
+}
+
+/* 🔊 SOM */
+function som(tipo){
+    let osc = ctx.createOscillator();
+    let gain = ctx.createGain();
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.frequency.value = tipo==="acerto"?700:200;
+
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+
+    osc.start();
+    osc.stop(ctx.currentTime + 0.3);
+}
+
+/* INICIAR */
+function iniciar(nivel){
+    nome = document.getElementById("nome").value || "Aluno";
+    dificuldade = nivel;
+    pontos = 0;
+    vidas = 3;
+
+    document.getElementById("menu").style.display="none";
+    document.getElementById("jogo").style.display="block";
+
+    musica();
+    gerar();
+}
+
+/* PERGUNTA */
+function gerar(){
+    let max = dificuldade==="facil"?5:
+              dificuldade==="medio"?8:10;
+
+    let n1 = Math.floor(Math.random()*max)+1;
+    let n2 = Math.floor(Math.random()*max)+1;
+
+    respostaCorreta = n1*n2;
+    document.getElementById("pergunta").innerText = `${n1} x ${n2}`;
+
+    let alt=[respostaCorreta,
+             respostaCorreta+Math.floor(Math.random()*10),
+             respostaCorreta-Math.floor(Math.random()*5)];
+
+    alt.sort(()=>Math.random()-0.5);
+
+    let html="";
+    alt.forEach(r=>{
+        html+=`<button onclick="verificar(${r})">${r}</button>`;
+    });
+
+    document.getElementById("respostas").innerHTML=html;
+
+    iniciarTimer();
+}
+
+/* TIMER */
+function iniciarTimer(){
+    clearInterval(timer);
+    tempoAtual = tempoMax;
+
+    timer = setInterval(()=>{
+        tempoAtual -= 100;
+
+        document.getElementById("timer").style.width = (tempoAtual/tempoMax*100)+"%";
+        document.getElementById("tempoNum").innerText = Math.ceil(tempoAtual/1000);
+
+        if(tempoAtual<=0){
+            clearInterval(timer);
+            vidas--;
+            animar("erro");
+            atualizar();
+
+            if(vidas<=0) gameOver();
+            else gerar();
+        }
+    },100);
+}
+
+/* ANIMAÇÃO */
+function animar(tipo){
+    let p = document.getElementById("personagem");
+    p.classList.remove("acertoAnim","erroAnim");
+
+    if(tipo==="acerto") p.classList.add("acertoAnim");
+    else p.classList.add("erroAnim");
+
+    setTimeout(()=>p.classList.remove("acertoAnim","erroAnim"),300);
+}
+
+/* VERIFICAR */
+function verificar(resp){
+    clearInterval(timer);
+
+    if(resp===respostaCorreta){
+        pontos+=10;
+        som("acerto");
+        animar("acerto");
+    } else {
+        vidas--;
+        som("erro");
+        animar("erro");
+    }
+
+    atualizar();
+
+    setTimeout(()=>{
+        if(vidas<=0) gameOver();
+        else gerar();
+    },500);
+}
+
+/* HUD */
+function atualizar(){
+    document.getElementById("vidas").innerText=vidas;
+    document.getElementById("pontos").innerText=pontos;
+}
+
+/* MEDALHA */
+function medalha(){
+    if(pontos<50) return "🥉";
+    if(pontos<100) return "🥈";
+    return "🥇";
+}
+
+/* GAME OVER */
+function gameOver(){
+    let ranking = JSON.parse(localStorage.getItem("ranking")||"[]");
+    ranking.push({nome,pontos});
+    ranking.sort((a,b)=>b.pontos-a.pontos);
+    ranking=ranking.slice(0,5);
+    localStorage.setItem("ranking", JSON.stringify(ranking));
+
+    document.body.innerHTML=`
+        <h1>💀 GAME OVER</h1>
+        <h2>${nome}</h2>
+        <p>Pontos: ${pontos} ${medalha()}</p>
+
+        <h3>🏆 Ranking</h3>
+        ${ranking.map(r=>`<p>${r.nome}: ${r.pontos}</p>`).join("")}
+
+        <button onclick="location.reload()">🔄 Jogar novamente</button>
+    `;
+}
+
+/* CARREGAR RANKING */
+function carregarRanking(){
+    let ranking = JSON.parse(localStorage.getItem("ranking")||"[]");
+    document.getElementById("ranking").innerHTML =
+        ranking.map(r=>`<p>${r.nome}: ${r.pontos}</p>`).join("");
+}
+
+carregarRanking();
+</script>
+
+</body>
+</html>
+
